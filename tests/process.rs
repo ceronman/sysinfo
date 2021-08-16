@@ -28,7 +28,7 @@ fn test_process() {
 fn test_process_cwd() {
     let p = std::process::Command::new("timeout.exe")
         .arg("/t")
-        .arg("3")
+        .arg("10")
         .spawn()
         .unwrap();
     let pid = p.id() as sysinfo::Pid;
@@ -42,6 +42,33 @@ fn test_process_cwd() {
     if let Some(p) = p {
         assert_eq!(p.pid(), pid);
         assert_eq!(p.cwd(), std::env::current_dir().unwrap());
+    } else {
+        assert!(false);
+    }
+}
+
+#[test]
+#[cfg(windows)]
+fn test_process_environ() {
+    let p = std::process::Command::new("timeout.exe")
+        .arg("/t")
+        .arg("10")
+        .env("FOO", "BAR")
+        .env("OTHER", "VALUE")
+        .spawn()
+        .unwrap();
+    let pid = p.id() as sysinfo::Pid;
+
+    let mut s = sysinfo::System::new();
+    s.refresh_processes();
+
+    let processes = s.processes();
+    let p = processes.get(&pid);
+
+    if let Some(p) = p {
+        assert_eq!(p.pid(), pid);
+        assert!(p.environ().iter().any(|e| e == "FOO=BAR"));
+        assert!(p.environ().iter().any(|e| e == "OTHER=VALUE"));
     } else {
         assert!(false);
     }
@@ -66,7 +93,7 @@ fn test_process_refresh() {
 fn test_get_cmd_line() {
     let p = std::process::Command::new("timeout")
         .arg("/t")
-        .arg("3")
+        .arg("10")
         .spawn()
         .unwrap();
     let mut s = sysinfo::System::new();
@@ -74,7 +101,7 @@ fn test_get_cmd_line() {
     s.refresh_processes();
     assert!(!s.processes().is_empty());
     if let Some(process) = s.process(p.id() as sysinfo::Pid) {
-        assert_eq!(process.cmd(), &["timeout", "/t", "3"]);
+        assert_eq!(process.cmd(), &["timeout", "/t", "10"]);
     } else {
         // We're very likely on a "linux-like" shell so let's try some unix command...
         unix_like_cmd();
