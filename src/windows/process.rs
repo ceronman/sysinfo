@@ -628,9 +628,6 @@ unsafe fn get_cwd(handle: HANDLE) -> PathBuf {
     if !NT_SUCCESS(result) {
         return PathBuf::new();
     }
-    buffer.push(0);
-
-    println!(">> {}", wchar_slice_to_string(buffer.as_slice()));
 
     PathBuf::from(wchar_slice_to_string(buffer.as_slice()))
 }
