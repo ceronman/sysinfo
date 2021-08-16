@@ -21,10 +21,10 @@ use once_cell::sync::Lazy;
 
 use ntapi::ntpsapi::{
     NtQueryInformationProcess, ProcessBasicInformation, ProcessCommandLineInformation,
-    PROCESSINFOCLASS, PROCESS_BASIC_INFORMATION,
+    ProcessWow64Information, PROCESSINFOCLASS, PROCESS_BASIC_INFORMATION,
 };
 use ntapi::ntrtl::RtlGetVersion;
-use winapi::shared::minwindef::{DWORD, FALSE, FILETIME, MAX_PATH, TRUE, ULONG};
+use winapi::shared::minwindef::{DWORD, FALSE, FILETIME, LPCVOID, LPVOID, MAX_PATH, TRUE, ULONG};
 use winapi::shared::ntdef::{NT_SUCCESS, UNICODE_STRING};
 use winapi::shared::ntstatus::{
     STATUS_BUFFER_OVERFLOW, STATUS_BUFFER_TOO_SMALL, STATUS_INFO_LENGTH_MISMATCH,
@@ -156,14 +156,7 @@ unsafe fn get_process_name(process_handler: HANDLE, h_mod: *mut c_void) -> Strin
         process_name.as_mut_ptr(),
         MAX_PATH as DWORD + 1,
     );
-    let mut pos = 0;
-    for x in process_name.iter() {
-        if *x == 0 {
-            break;
-        }
-        pos += 1;
-    }
-    String::from_utf16_lossy(&process_name[..pos])
+    wchar_slice_to_string(&process_name)
 }
 
 unsafe fn get_h_mod(process_handler: HANDLE, h_mod: &mut *mut c_void) -> bool {
@@ -186,15 +179,7 @@ unsafe fn get_exe(process_handler: HANDLE, h_mod: *mut c_void) -> PathBuf {
         MAX_PATH as DWORD + 1,
     );
 
-    let mut pos = 0;
-    for x in exe_buf.iter() {
-        if *x == 0 {
-            break;
-        }
-        pos += 1;
-    }
-
-    PathBuf::from(String::from_utf16_lossy(&exe_buf[..pos]))
+    PathBuf::from(wchar_slice_to_string(&exe_buf))
 }
 
 impl Process {
@@ -252,7 +237,7 @@ impl Process {
                 cmd: get_cmd_line(handle),
                 environ,
                 exe,
-                cwd: PathBuf::new(),
+                cwd: unsafe { get_cwd(handle) },
                 root,
                 status: ProcessStatus::Run,
                 memory,
@@ -314,7 +299,7 @@ impl Process {
                 cmd: get_cmd_line(process_handler),
                 environ,
                 exe,
-                cwd: PathBuf::new(),
+                cwd: get_cwd(process_handler),
                 root,
                 status: ProcessStatus::Run,
                 memory: 0,
@@ -525,6 +510,146 @@ unsafe fn get_cmdline_from_buffer(buffer: *const u16) -> Vec<String> {
     winapi::um::winbase::LocalFree(argv_p as *mut _);
 
     res
+}
+
+#[cfg(target_pointer_width = "64")]
+unsafe fn get_cwd(handle: HANDLE) -> PathBuf {
+    use winapi::shared::basetsd::SIZE_T;
+    use winapi::um::memoryapi::ReadProcessMemory;
+
+    // First check if target process is running in wow64 compatibility emulator
+    let mut pwow32info = MaybeUninit::<LPVOID>::uninit();
+    let result = NtQueryInformationProcess(
+        handle,
+        ProcessWow64Information,
+        pwow32info.as_mut_ptr() as *mut _,
+        size_of::<LPCVOID>() as u32,
+        null_mut(),
+    );
+    if !NT_SUCCESS(result) {
+        return PathBuf::new();
+    }
+    let pwow32info = pwow32info.assume_init();
+
+    let (ptr, size) = if pwow32info.is_null() {
+        // target is a 64 bit process
+        use ntapi::ntpebteb::PEB;
+        use ntapi::ntrtl::{PRTL_USER_PROCESS_PARAMETERS, RTL_USER_PROCESS_PARAMETERS};
+
+        let mut pbasicinfo = MaybeUninit::<PROCESS_BASIC_INFORMATION>::uninit();
+        let result = NtQueryInformationProcess(
+            handle,
+            ProcessBasicInformation,
+            pbasicinfo.as_mut_ptr() as *mut _,
+            size_of::<PROCESS_BASIC_INFORMATION>() as u32,
+            null_mut(),
+        );
+        if !NT_SUCCESS(result) {
+            return PathBuf::new();
+        }
+        let pinfo = pbasicinfo.assume_init();
+
+        let mut peb = MaybeUninit::<PEB>::uninit();
+        let result = ReadProcessMemory(
+            handle,
+            pinfo.PebBaseAddress as *mut _,
+            peb.as_mut_ptr() as *mut _,
+            size_of::<PEB>() as SIZE_T,
+            std::ptr::null_mut(),
+        );
+        if !NT_SUCCESS(result) {
+            return PathBuf::new();
+        }
+        let peb = peb.assume_init();
+
+        let mut proc_params = MaybeUninit::<RTL_USER_PROCESS_PARAMETERS>::uninit();
+        let result = ReadProcessMemory(
+            handle,
+            peb.ProcessParameters as *mut PRTL_USER_PROCESS_PARAMETERS as *mut _,
+            proc_params.as_mut_ptr() as *mut _,
+            size_of::<RTL_USER_PROCESS_PARAMETERS>() as SIZE_T,
+            std::ptr::null_mut(),
+        );
+        if !NT_SUCCESS(result) {
+            return PathBuf::new();
+        }
+        let proc_params = proc_params.assume_init();
+
+        let ptr = proc_params.CurrentDirectory.DosPath.Buffer;
+        let size = proc_params.CurrentDirectory.DosPath.Length;
+        (ptr as LPVOID, size as usize)
+    } else {
+        // target is a 32 bit process in wow64 mode
+        use ntapi::ntwow64::{
+            PEB32, PRTL_USER_PROCESS_PARAMETERS32, RTL_USER_PROCESS_PARAMETERS32,
+        };
+
+        let mut peb32 = MaybeUninit::<PEB32>::uninit();
+        let result = ReadProcessMemory(
+            handle,
+            pwow32info,
+            peb32.as_mut_ptr() as *mut _,
+            size_of::<PEB32>() as SIZE_T,
+            std::ptr::null_mut(),
+        );
+        if !NT_SUCCESS(result) {
+            return PathBuf::new();
+        }
+        let peb32 = peb32.assume_init();
+
+        let mut proc_params = MaybeUninit::<RTL_USER_PROCESS_PARAMETERS32>::uninit();
+        let result = ReadProcessMemory(
+            handle,
+            peb32.ProcessParameters as *mut PRTL_USER_PROCESS_PARAMETERS32 as *mut _,
+            proc_params.as_mut_ptr() as *mut _,
+            size_of::<RTL_USER_PROCESS_PARAMETERS32>() as SIZE_T,
+            std::ptr::null_mut(),
+        );
+        if !NT_SUCCESS(result) {
+            return PathBuf::new();
+        }
+        let proc_params = proc_params.assume_init();
+
+        let ptr = proc_params.CurrentDirectory.DosPath.Buffer;
+        let size = proc_params.CurrentDirectory.DosPath.Length;
+        (ptr as LPVOID, size as usize)
+    };
+
+    let mut buffer: Vec<u16> = Vec::with_capacity(size / 2 + 1);
+    buffer.set_len(size / 2);
+    let result = ReadProcessMemory(
+        handle,
+        ptr as *mut _,
+        buffer.as_mut_ptr() as *mut _,
+        size,
+        std::ptr::null_mut(),
+    );
+
+    if !NT_SUCCESS(result) {
+        return PathBuf::new();
+    }
+    buffer.push(0);
+
+    println!(">> {}", wchar_slice_to_string(buffer.as_slice()));
+
+    PathBuf::from(wchar_slice_to_string(buffer.as_slice()))
+}
+
+unsafe fn wchar_slice_to_string(slice: &[u16]) -> String {
+    let mut pos = 0;
+    for x in slice.iter() {
+        if *x == 0 {
+            break;
+        }
+        pos += 1;
+    }
+    String::from_utf16_lossy(&slice[..pos])
+}
+
+#[cfg(not(target_pointer_width = "64"))]
+unsafe fn get_cwd(handle: HANDLE) -> PathBuf {
+    // Getting cwd from a non 64 bit process is not supported.
+    PathBuf::new()
 }
 
 fn get_cmd_line_old(handle: HANDLE) -> Vec<String> {

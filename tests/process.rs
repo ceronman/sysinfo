@@ -24,9 +24,10 @@ fn test_process() {
 }
 
 #[test]
-#[cfg(not(windows))]
+#[cfg(windows)]
 fn test_process_cwd() {
-    let p = std::process::Command::new("sleep")
+    let p = std::process::Command::new("timeout.exe")
+        .arg("/t")
         .arg("3")
         .spawn()
         .unwrap();
@@ -35,21 +36,14 @@ fn test_process_cwd() {
     let mut s = sysinfo::System::new();
     s.refresh_processes();
 
-    if !sysinfo::System::IS_SUPPORTED || cfg!(feature = "apple-sandbox") {
-        return;
-    }
-
     let processes = s.processes();
     let p = processes.get(&pid);
 
     if let Some(p) = p {
         assert_eq!(p.pid(), pid);
-        assert_eq!(
-            p.cwd().to_str().unwrap(),
-            std::env::current_dir().unwrap().to_str().unwrap()
-        );
+        assert_eq!(p.cwd(), std::env::current_dir().unwrap());
     } else {
-        panic!("Process not found");
+        assert!(false);
     }
 }
 
