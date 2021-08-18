@@ -26,15 +26,17 @@ fn test_process() {
 #[test]
 #[cfg(windows)]
 fn test_process_cwd() {
-    let p = std::process::Command::new("timeout.exe")
+    let mut p = std::process::Command::new("timeout.exe")
         .arg("/t")
-        .arg("10")
+        .arg("60")
+        .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
     let pid = p.id() as sysinfo::Pid;
-
+    std::thread::sleep(std::time::Duration::from_millis(250));
     let mut s = sysinfo::System::new();
     s.refresh_processes();
+    p.kill().unwrap();
 
     let processes = s.processes();
     let p = processes.get(&pid);
@@ -49,14 +51,16 @@ fn test_process_cwd() {
 }
 
 fn unix_like_cwd() {
-    let p = std::process::Command::new("sleep")
-        .arg("10")
+    let mut p = std::process::Command::new("sleep")
+        .arg("60")
+        .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
     let pid = p.id() as sysinfo::Pid;
-
+    std::thread::sleep(std::time::Duration::from_millis(250));
     let mut s = sysinfo::System::new();
     s.refresh_processes();
+    p.kill().unwrap();
 
     let processes = s.processes();
     let p = processes.get(&pid);
@@ -73,17 +77,19 @@ fn unix_like_cwd() {
 #[test]
 #[cfg(windows)]
 fn test_process_environ() {
-    let p = std::process::Command::new("timeout.exe")
+    let mut p = std::process::Command::new("timeout.exe")
         .arg("/t")
-        .arg("10")
+        .arg("60")
+        .stdout(std::process::Stdio::null())
         .env("FOO", "BAR")
         .env("OTHER", "VALUE")
         .spawn()
         .unwrap();
     let pid = p.id() as sysinfo::Pid;
-
+    std::thread::sleep(std::time::Duration::from_millis(250));
     let mut s = sysinfo::System::new();
     s.refresh_processes();
+    p.kill().unwrap();
 
     let processes = s.processes();
     let p = processes.get(&pid);
@@ -99,16 +105,18 @@ fn test_process_environ() {
 }
 
 fn unix_like_environ() {
-    let p = std::process::Command::new("sleep")
-        .arg("10")
+    let mut p = std::process::Command::new("sleep")
+        .arg("60")
+        .stdout(std::process::Stdio::null())
         .env("FOO", "BAR")
         .env("OTHER", "VALUE")
         .spawn()
         .unwrap();
     let pid = p.id() as sysinfo::Pid;
-
+    std::thread::sleep(std::time::Duration::from_millis(250));
     let mut s = sysinfo::System::new();
     s.refresh_processes();
+    p.kill().unwrap();
 
     let processes = s.processes();
     let p = processes.get(&pid);
@@ -139,17 +147,20 @@ fn test_process_refresh() {
 #[test]
 #[cfg(windows)]
 fn test_get_cmd_line() {
-    let p = std::process::Command::new("timeout")
+    let mut p = std::process::Command::new("timeout")
         .arg("/t")
-        .arg("10")
+        .arg("60")
+        .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(250));
     let mut s = sysinfo::System::new();
     assert!(s.processes().is_empty());
     s.refresh_processes();
+    p.kill().unwrap();
     assert!(!s.processes().is_empty());
     if let Some(process) = s.process(p.id() as sysinfo::Pid) {
-        assert_eq!(process.cmd(), &["timeout", "/t", "10"]);
+        assert_eq!(process.cmd(), &["timeout", "/t", "60"]);
     } else {
         // We're very likely on a "linux-like" shell so let's try some unix command...
         unix_like_cmd();
@@ -167,8 +178,9 @@ fn test_get_cmd_line() {
 fn unix_like_cmd() {
     use std::{thread, time};
 
-    let p = std::process::Command::new("sleep")
-        .arg("3")
+    let mut p = std::process::Command::new("sleep")
+        .arg("60")
+        .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
     // To ensure that the system data are filled correctly...
@@ -176,10 +188,11 @@ fn unix_like_cmd() {
     let mut s = sysinfo::System::new();
     assert!(s.processes().is_empty());
     s.refresh_processes();
+    p.kill().unwrap();
     assert!(!s.processes().is_empty());
     let process = s.process(p.id() as sysinfo::Pid).unwrap();
-    if process.cmd() != ["sleep", "3"] {
-        panic!("cmd not equivalent to`[sleep, 3]`: {:?}", process);
+    if process.cmd() != ["sleep", "60"] {
+        panic!("cmd not equivalent to`[sleep, 60]`: {:?}", process);
     }
 }
 
