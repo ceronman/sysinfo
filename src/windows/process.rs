@@ -744,7 +744,10 @@ fn get_proc_env(handle: HANDLE) -> Vec<String> {
                 }
                 result
             }
-            Err(_) => Vec::new(),
+            Err(e) => {
+                sysinfo_debug!("get_proc_env failed to get data: {}", e);
+                Vec::new()
+            }
         }
     }
 }
