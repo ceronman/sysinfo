@@ -683,8 +683,8 @@ fn get_cwd(handle: HANDLE) -> PathBuf {
     unsafe {
         match get_process_data(handle, ProcessDataKind::CWD) {
             Ok(buffer) => PathBuf::from(wchar_slice_to_string(buffer.as_slice())),
-            Err(e) => {
-                sysinfo_debug!("get_cwd failed to get data: {}", e);
+            Err(_e) => {
+                sysinfo_debug!("get_cwd failed to get data: {}", _e);
                 PathBuf::new()
             }
         }
@@ -702,8 +702,8 @@ fn get_cmd_line_old(handle: HANDLE) -> Vec<String> {
     unsafe {
         match get_process_data(handle, ProcessDataKind::CMDLINE) {
             Ok(buffer) => get_cmdline_from_buffer(buffer.as_ptr()),
-            Err(e) => {
-                sysinfo_debug!("get_cmd_line_old failed to get data: {}", e);
+            Err(_e) => {
+                sysinfo_debug!("get_cmd_line_old failed to get data: {}", _e);
                 Vec::new()
             }
         }
@@ -750,8 +750,8 @@ fn get_proc_env(handle: HANDLE) -> Vec<String> {
                 }
                 result
             }
-            Err(e) => {
-                sysinfo_debug!("get_proc_env failed to get data: {}", e);
+            Err(_e) => {
+                sysinfo_debug!("get_proc_env failed to get data: {}", _e);
                 Vec::new()
             }
         }

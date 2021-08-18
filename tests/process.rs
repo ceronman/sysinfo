@@ -43,7 +43,30 @@ fn test_process_cwd() {
         assert_eq!(p.pid(), pid);
         assert_eq!(p.cwd(), std::env::current_dir().unwrap());
     } else {
-        assert!(false);
+        // We're very likely on a "linux-like" shell so let's try some unix command...
+        unix_like_cwd()
+    }
+}
+
+fn unix_like_cwd() {
+    let p = std::process::Command::new("sleep")
+        .arg("10")
+        .spawn()
+        .unwrap();
+    let pid = p.id() as sysinfo::Pid;
+
+    let mut s = sysinfo::System::new();
+    s.refresh_processes();
+
+    let processes = s.processes();
+    let p = processes.get(&pid);
+
+    if let Some(p) = p {
+        assert_eq!(p.pid(), pid);
+        assert_eq!(p.cwd(), std::env::current_dir().unwrap());
+    } else {
+        // We're very likely on a "linux-like" shell so let's try some unix command...
+        unix_like_environ();
     }
 }
 
@@ -70,7 +93,32 @@ fn test_process_environ() {
         assert!(p.environ().iter().any(|e| e == "FOO=BAR"));
         assert!(p.environ().iter().any(|e| e == "OTHER=VALUE"));
     } else {
-        assert!(false);
+        // We're very likely on a "linux-like" shell so let's try some unix command...
+        unix_like_environ();
+    }
+}
+
+fn unix_like_environ() {
+    let p = std::process::Command::new("sleep")
+        .arg("10")
+        .env("FOO", "BAR")
+        .env("OTHER", "VALUE")
+        .spawn()
+        .unwrap();
+    let pid = p.id() as sysinfo::Pid;
+
+    let mut s = sysinfo::System::new();
+    s.refresh_processes();
+
+    let processes = s.processes();
+    let p = processes.get(&pid);
+
+    if let Some(p) = p {
+        assert_eq!(p.pid(), pid);
+        assert!(p.environ().iter().any(|e| e == "FOO=BAR"));
+        assert!(p.environ().iter().any(|e| e == "OTHER=VALUE"));
+    } else {
+        panic!("No process found!")
     }
 }
 
