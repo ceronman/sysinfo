@@ -699,7 +699,10 @@ fn get_cmd_line_old(handle: HANDLE) -> Vec<String> {
     unsafe {
         match get_process_data(handle, ProcessDataKind::CMDLINE) {
             Ok(buffer) => get_cmdline_from_buffer(buffer.as_ptr()),
-            Err(_) => Vec::new(),
+            Err(e) => {
+                sysinfo_debug!("get_cmd_line_old failed to get data: {}", e);
+                Vec::new()
+            }
         }
     }
 }
