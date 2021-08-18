@@ -683,7 +683,10 @@ fn get_cwd(handle: HANDLE) -> PathBuf {
     unsafe {
         match get_process_data(handle, ProcessDataKind::CWD) {
             Ok(buffer) => PathBuf::from(wchar_slice_to_string(buffer.as_slice())),
-            Err(_) => PathBuf::new(),
+            Err(e) => {
+                sysinfo_debug!("get_cwd failed to get data: {}", e);
+                PathBuf::new()
+            }
         }
     }
 }
