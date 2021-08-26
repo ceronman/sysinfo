@@ -26,10 +26,10 @@ fn test_process() {
 #[test]
 #[cfg(windows)]
 fn test_cwd() {
-    let mut p = std::process::Command::new("timeout.exe")
+    let mut p = std::process::Command::new("waitfor")
         .arg("/t")
-        .arg("60")
-        .arg("/nobreak")
+        .arg("10")
+        .arg("CwdSignal")
         .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
@@ -61,7 +61,7 @@ fn test_cwd() {
 
 fn unix_like_cwd() {
     let mut p = std::process::Command::new("sleep")
-        .arg("60")
+        .arg("10")
         .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
@@ -98,11 +98,11 @@ fn test_process_refresh() {
 
 #[test]
 #[cfg(windows)]
-fn test_get_cmd_line() {
-    let mut p = std::process::Command::new("timeout.exe")
+fn test_cmd() {
+    let mut p = std::process::Command::new("waitfor")
         .arg("/t")
-        .arg("60")
-        .arg("/nobreak")
+        .arg("10")
+        .arg("CmdSignal")
         .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
@@ -113,7 +113,7 @@ fn test_get_cmd_line() {
     p.kill().ok();
     assert!(!s.processes().is_empty());
     if let Some(process) = s.process(p.id() as sysinfo::Pid) {
-        assert_eq!(process.cmd(), &["timeout.exe", "/t", "60"]);
+        assert_eq!(process.cmd(), &["waitfor", "/t", "10", "CmdSignal"]);
     } else {
         // We're very likely on a "linux-like" shell so let's try some unix command...
         unix_like_cmd();
@@ -132,7 +132,7 @@ fn unix_like_cmd() {
     use std::{thread, time};
 
     let mut p = std::process::Command::new("sleep")
-        .arg("60")
+        .arg("10")
         .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
@@ -144,18 +144,18 @@ fn unix_like_cmd() {
     p.kill().ok();
     assert!(!s.processes().is_empty());
     let process = s.process(p.id() as sysinfo::Pid).unwrap();
-    if process.cmd() != ["sleep", "60"] {
-        panic!("cmd not equivalent to`[sleep, 60]`: {:?}", process);
+    if process.cmd() != ["sleep", "10"] {
+        panic!("cmd not equivalent to`[sleep, 10]`: {:?}", process);
     }
 }
 
 #[test]
 #[cfg(windows)]
 fn test_environ() {
-    let mut p = std::process::Command::new("timeout.exe")
+    let mut p = std::process::Command::new("waitfor")
         .arg("/t")
-        .arg("60")
-        .arg("/nobreak")
+        .arg("10")
+        .arg("EnvironSignal")
         .stdout(std::process::Stdio::null())
         .env("FOO", "BAR")
         .env("OTHER", "VALUE")
@@ -190,7 +190,7 @@ fn test_environ() {
 
 fn unix_like_environ() {
     let mut p = std::process::Command::new("sleep")
-        .arg("60")
+        .arg("10")
         .stdout(std::process::Stdio::null())
         .env("FOO", "BAR")
         .env("OTHER", "VALUE")
