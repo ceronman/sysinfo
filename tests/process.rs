@@ -29,6 +29,7 @@ fn test_cwd() {
     let mut p = std::process::Command::new("timeout.exe")
         .arg("/t")
         .arg("60")
+        .arg("/nobreak")
         .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
@@ -101,6 +102,7 @@ fn test_get_cmd_line() {
     let mut p = std::process::Command::new("timeout.exe")
         .arg("/t")
         .arg("60")
+        .arg("/nobreak")
         .stdout(std::process::Stdio::null())
         .spawn()
         .unwrap();
@@ -153,6 +155,7 @@ fn test_environ() {
     let mut p = std::process::Command::new("timeout.exe")
         .arg("/t")
         .arg("60")
+        .arg("/nobreak")
         .stdout(std::process::Stdio::null())
         .env("FOO", "BAR")
         .env("OTHER", "VALUE")
@@ -187,7 +190,7 @@ fn test_environ() {
 
 fn unix_like_environ() {
     let mut p = std::process::Command::new("sleep")
-        .arg("3")
+        .arg("60")
         .stdout(std::process::Stdio::null())
         .env("FOO", "BAR")
         .env("OTHER", "VALUE")
