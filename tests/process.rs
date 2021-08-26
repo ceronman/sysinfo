@@ -25,7 +25,7 @@ fn test_process() {
 
 #[test]
 #[cfg(windows)]
-fn test_process_cwd() {
+fn test_cwd() {
     let mut p = std::process::Command::new("timeout.exe")
         .arg("/t")
         .arg("60")
@@ -36,7 +36,7 @@ fn test_process_cwd() {
     std::thread::sleep(std::time::Duration::from_millis(250));
     let mut s = sysinfo::System::new();
     s.refresh_processes();
-    p.kill().unwrap();
+    p.kill().ok();
 
     let processes = s.processes();
     let p = processes.get(&pid);
@@ -50,6 +50,14 @@ fn test_process_cwd() {
     }
 }
 
+#[test]
+#[cfg(not(windows))]
+fn test_cmd() {
+    if sysinfo::System::IS_SUPPORTED && !cfg!(feature = "apple-sandbox") {
+        unix_like_cwd();
+    }
+}
+
 fn unix_like_cwd() {
     let mut p = std::process::Command::new("sleep")
         .arg("60")
@@ -60,7 +68,7 @@ fn unix_like_cwd() {
     std::thread::sleep(std::time::Duration::from_millis(250));
     let mut s = sysinfo::System::new();
     s.refresh_processes();
-    p.kill().unwrap();
+    p.kill().ok();
 
     let processes = s.processes();
     let p = processes.get(&pid);
@@ -69,64 +77,7 @@ fn unix_like_cwd() {
         assert_eq!(p.pid(), pid);
         assert_eq!(p.cwd(), std::env::current_dir().unwrap());
     } else {
-        // We're very likely on a "linux-like" shell so let's try some unix command...
-        unix_like_environ();
-    }
-}
-
-#[test]
-#[cfg(windows)]
-fn test_process_environ() {
-    let mut p = std::process::Command::new("timeout.exe")
-        .arg("/t")
-        .arg("60")
-        .stdout(std::process::Stdio::null())
-        .env("FOO", "BAR")
-        .env("OTHER", "VALUE")
-        .spawn()
-        .unwrap();
-    let pid = p.id() as sysinfo::Pid;
-    std::thread::sleep(std::time::Duration::from_millis(250));
-    let mut s = sysinfo::System::new();
-    s.refresh_processes();
-    p.kill().unwrap();
-
-    let processes = s.processes();
-    let p = processes.get(&pid);
-
-    if let Some(p) = p {
-        assert_eq!(p.pid(), pid);
-        assert!(p.environ().iter().any(|e| e == "FOO=BAR"));
-        assert!(p.environ().iter().any(|e| e == "OTHER=VALUE"));
-    } else {
-        // We're very likely on a "linux-like" shell so let's try some unix command...
-        unix_like_environ();
-    }
-}
-
-fn unix_like_environ() {
-    let mut p = std::process::Command::new("sleep")
-        .arg("60")
-        .stdout(std::process::Stdio::null())
-        .env("FOO", "BAR")
-        .env("OTHER", "VALUE")
-        .spawn()
-        .unwrap();
-    let pid = p.id() as sysinfo::Pid;
-    std::thread::sleep(std::time::Duration::from_millis(250));
-    let mut s = sysinfo::System::new();
-    s.refresh_processes();
-    p.kill().unwrap();
-
-    let processes = s.processes();
-    let p = processes.get(&pid);
-
-    if let Some(p) = p {
-        assert_eq!(p.pid(), pid);
-        assert!(p.environ().iter().any(|e| e == "FOO=BAR"));
-        assert!(p.environ().iter().any(|e| e == "OTHER=VALUE"));
-    } else {
-        panic!("No process found!")
+        panic!("Process not found");
     }
 }
 
@@ -147,7 +98,7 @@ fn test_process_refresh() {
 #[test]
 #[cfg(windows)]
 fn test_get_cmd_line() {
-    let mut p = std::process::Command::new("timeout")
+    let mut p = std::process::Command::new("timeout.exe")
         .arg("/t")
         .arg("60")
         .stdout(std::process::Stdio::null())
@@ -157,10 +108,10 @@ fn test_get_cmd_line() {
     let mut s = sysinfo::System::new();
     assert!(s.processes().is_empty());
     s.refresh_processes();
-    p.kill().unwrap();
+    p.kill().ok();
     assert!(!s.processes().is_empty());
     if let Some(process) = s.process(p.id() as sysinfo::Pid) {
-        assert_eq!(process.cmd(), &["timeout", "/t", "60"]);
+        assert_eq!(process.cmd(), &["timeout.exe", "/t", "60"]);
     } else {
         // We're very likely on a "linux-like" shell so let's try some unix command...
         unix_like_cmd();
@@ -169,7 +120,7 @@ fn test_get_cmd_line() {
 
 #[test]
 #[cfg(not(windows))]
-fn test_get_cmd_line() {
+fn test_cmd() {
     if sysinfo::System::IS_SUPPORTED && !cfg!(feature = "apple-sandbox") {
         unix_like_cmd();
     }
@@ -188,7 +139,7 @@ fn unix_like_cmd() {
     let mut s = sysinfo::System::new();
     assert!(s.processes().is_empty());
     s.refresh_processes();
-    p.kill().unwrap();
+    p.kill().ok();
     assert!(!s.processes().is_empty());
     let process = s.process(p.id() as sysinfo::Pid).unwrap();
     if process.cmd() != ["sleep", "60"] {
@@ -197,12 +148,44 @@ fn unix_like_cmd() {
 }
 
 #[test]
+#[cfg(windows)]
+fn test_environ() {
+    let mut p = std::process::Command::new("timeout.exe")
+        .arg("/t")
+        .arg("60")
+        .stdout(std::process::Stdio::null())
+        .env("FOO", "BAR")
+        .env("OTHER", "VALUE")
+        .spawn()
+        .unwrap();
+    let pid = p.id() as sysinfo::Pid;
+    std::thread::sleep(std::time::Duration::from_millis(250));
+    let mut s = sysinfo::System::new();
+    s.refresh_processes();
+    p.kill().ok();
+
+    let processes = s.processes();
+    let p = processes.get(&pid);
+
+    if let Some(p) = p {
+        assert_eq!(p.pid(), pid);
+        assert!(p.environ().iter().any(|e| e == "FOO=BAR"));
+        assert!(p.environ().iter().any(|e| e == "OTHER=VALUE"));
+    } else {
+        // We're very likely on a "linux-like" shell so let's try some unix command...
+        unix_like_environ();
+    }
+}
+
+#[test]
 #[cfg(not(windows))]
 fn test_environ() {
-    if !sysinfo::System::IS_SUPPORTED {
-        return;
+    if sysinfo::System::IS_SUPPORTED && !cfg!(feature = "apple-sandbox") {
+        unix_like_environ()
     }
+}
 
+fn unix_like_environ() {
     let mut p = std::process::Command::new("sleep")
         .arg("3")
         .stdout(std::process::Stdio::null())
@@ -214,7 +197,7 @@ fn test_environ() {
     std::thread::sleep(std::time::Duration::from_millis(250));
     let mut s = sysinfo::System::new();
     s.refresh_processes();
-    p.kill().unwrap();
+    p.kill().ok();
 
     let processes = s.processes();
     let p = processes.get(&pid);
