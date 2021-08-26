@@ -52,7 +52,7 @@ fn test_cwd() {
 
 #[test]
 #[cfg(not(windows))]
-fn test_cmd() {
+fn test_cwd() {
     if sysinfo::System::IS_SUPPORTED && !cfg!(feature = "apple-sandbox") {
         unix_like_cwd();
     }
