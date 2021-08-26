@@ -88,7 +88,11 @@ fn test_cmd() {
     p.kill().ok();
     assert!(!s.processes().is_empty());
     if let Some(process) = s.process(p.id() as sysinfo::Pid) {
-        assert_eq!(process.cmd(), &["waitfor", "/t", "10", "CmdSignal"]);
+        if cfg!(target_os = "windows") {
+            assert_eq!(process.cmd(), &["waitfor", "/t", "10", "CmdSignal"]);
+        } else {
+            assert_eq!(process.cmd(), &["sleep", "10"]);
+        }
     } else {
         panic!("Process not found!");
     }
