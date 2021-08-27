@@ -738,13 +738,14 @@ fn get_proc_env(handle: HANDLE) -> Vec<String> {
     unsafe {
         match get_process_data(handle, ProcessDataKind::ENVIRON) {
             Ok(buffer) => {
-	            let raw_env= OsString::from_wide(buffer.as_slice()).to_string_lossy().into_owned();
+                let equals = "=".encode_utf16().next().unwrap();
+	            let raw_env= buffer;//OsString::from_wide(buffer.as_slice()).to_string_lossy().into_owned();
                 let mut result = Vec::new();
                 let mut begin = 0;
-                while let Some(offset) = raw_env[begin..].find('\u{0}') {
+                while let Some(offset) = raw_env[begin..].iter().position(|&c| c == 0) {
                     let end = begin + offset;
-                    if raw_env[begin..end].find('=').is_some() {
-                        result.push(raw_env[begin..end].to_string());
+                    if raw_env[begin..end].iter().position(|&c| c == equals).is_some() {
+                        result.push(OsString::from_wide(&raw_env[begin..end]).to_string_lossy().into_owned());
                         begin = end + 1;
                     } else {
                         break;
