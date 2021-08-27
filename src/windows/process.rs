@@ -162,7 +162,7 @@ unsafe fn get_process_name(process_handler: HANDLE, h_mod: *mut c_void) -> Strin
         process_name.as_mut_ptr(),
         MAX_PATH as DWORD + 1,
     );
-    wchar_slice_to_string(&process_name)
+    null_terminated_wchar_to_string(&process_name)
 }
 
 unsafe fn get_h_mod(process_handler: HANDLE, h_mod: &mut *mut c_void) -> bool {
@@ -185,7 +185,7 @@ unsafe fn get_exe(process_handler: HANDLE, h_mod: *mut c_void) -> PathBuf {
         MAX_PATH as DWORD + 1,
     );
 
-    PathBuf::from(wchar_slice_to_string(&exe_buf))
+    PathBuf::from(null_terminated_wchar_to_string(&exe_buf))
 }
 
 impl Process {
@@ -684,7 +684,7 @@ unsafe fn get_process_data(
 fn get_cwd(handle: HANDLE) -> PathBuf {
     unsafe {
         match get_process_data(handle, ProcessDataKind::CWD) {
-            Ok(buffer) => PathBuf::from(wchar_slice_to_string(buffer.as_slice())),
+            Ok(buffer) => PathBuf::from(null_terminated_wchar_to_string(buffer.as_slice())),
             Err(_e) => {
                 sysinfo_debug!("get_cwd failed to get data: {}", _e);
                 PathBuf::new()
@@ -693,10 +693,12 @@ fn get_cwd(handle: HANDLE) -> PathBuf {
     }
 }
 
-unsafe fn wchar_slice_to_string(slice: &[u16]) -> String {
+unsafe fn null_terminated_wchar_to_string(slice: &[u16]) -> String {
     match slice.iter().position(|&x| x == 0) {
-        Some(pos) => String::from_utf16_lossy(&slice[..pos]),
-        None => String::from_utf16_lossy(slice),
+        Some(pos) => OsString::from_wide(&slice[..pos])
+            .to_string_lossy()
+            .into_owned(),
+        None => OsString::from_wide(slice).to_string_lossy().into_owned(),
     }
 }
 
@@ -739,13 +741,21 @@ fn get_proc_env(handle: HANDLE) -> Vec<String> {
         match get_process_data(handle, ProcessDataKind::ENVIRON) {
             Ok(buffer) => {
                 let equals = "=".encode_utf16().next().unwrap();
-	            let raw_env= buffer;//OsString::from_wide(buffer.as_slice()).to_string_lossy().into_owned();
+                let raw_env = buffer;
                 let mut result = Vec::new();
                 let mut begin = 0;
                 while let Some(offset) = raw_env[begin..].iter().position(|&c| c == 0) {
                     let end = begin + offset;
-                    if raw_env[begin..end].iter().position(|&c| c == equals).is_some() {
-                        result.push(OsString::from_wide(&raw_env[begin..end]).to_string_lossy().into_owned());
+                    if raw_env[begin..end]
+                        .iter()
+                        .position(|&c| c == equals)
+                        .is_some()
+                    {
+                        result.push(
+                            OsString::from_wide(&raw_env[begin..end])
+                                .to_string_lossy()
+                                .into_owned(),
+                        );
                         begin = end + 1;
                     } else {
                         break;
