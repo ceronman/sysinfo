@@ -31,14 +31,14 @@ fn test_cwd() {
     let mut p = if cfg!(target_os = "windows") {
         std::process::Command::new("waitfor")
             .arg("/t")
-            .arg("10")
+            .arg("3")
             .arg("CwdSignal")
             .stdout(std::process::Stdio::null())
             .spawn()
             .unwrap()
     } else {
         std::process::Command::new("sleep")
-            .arg("10")
+            .arg("3")
             .stdout(std::process::Stdio::null())
             .spawn()
             .unwrap()
@@ -69,14 +69,14 @@ fn test_cmd() {
     let mut p = if cfg!(target_os = "windows") {
         std::process::Command::new("waitfor")
             .arg("/t")
-            .arg("10")
+            .arg("3")
             .arg("CmdSignal")
             .stdout(std::process::Stdio::null())
             .spawn()
             .unwrap()
     } else {
         std::process::Command::new("sleep")
-            .arg("10")
+            .arg("3")
             .stdout(std::process::Stdio::null())
             .spawn()
             .unwrap()
@@ -89,9 +89,9 @@ fn test_cmd() {
     assert!(!s.processes().is_empty());
     if let Some(process) = s.process(p.id() as sysinfo::Pid) {
         if cfg!(target_os = "windows") {
-            assert_eq!(process.cmd(), &["waitfor", "/t", "10", "CmdSignal"]);
+            assert_eq!(process.cmd(), &["waitfor", "/t", "3", "CmdSignal"]);
         } else {
-            assert_eq!(process.cmd(), &["sleep", "10"]);
+            assert_eq!(process.cmd(), &["sleep", "3"]);
         }
     } else {
         panic!("Process not found!");
@@ -106,7 +106,7 @@ fn test_environ() {
     let mut p = if cfg!(target_os = "windows") {
         std::process::Command::new("waitfor")
             .arg("/t")
-            .arg("10")
+            .arg("3")
             .arg("EnvironSignal")
             .stdout(std::process::Stdio::null())
             .env("FOO", "BAR")
@@ -115,7 +115,7 @@ fn test_environ() {
             .unwrap()
     } else {
         std::process::Command::new("sleep")
-            .arg("10")
+            .arg("3")
             .stdout(std::process::Stdio::null())
             .env("FOO", "BAR")
             .env("OTHER", "VALUE")

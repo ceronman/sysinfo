@@ -6,9 +6,11 @@
 
 use crate::{DiskUsage, Pid, ProcessExt, Signal};
 
+use std::ffi::OsString;
 use std::fmt::{self, Debug};
 use std::mem::{size_of, zeroed, MaybeUninit};
 use std::ops::Deref;
+use std::os::windows::ffi::OsStringExt;
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process;
@@ -736,7 +738,7 @@ fn get_proc_env(handle: HANDLE) -> Vec<String> {
     unsafe {
         match get_process_data(handle, ProcessDataKind::ENVIRON) {
             Ok(buffer) => {
-                let raw_env = String::from_utf16_lossy(buffer.as_slice());
+	            let raw_env= OsString::from_wide(buffer.as_slice()).to_string_lossy().into_owned();
                 let mut result = Vec::new();
                 let mut begin = 0;
                 while let Some(offset) = raw_env[begin..].find('\u{0}') {
