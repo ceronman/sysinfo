@@ -748,8 +748,7 @@ fn get_proc_env(handle: HANDLE) -> Vec<String> {
                     let end = begin + offset;
                     if raw_env[begin..end]
                         .iter()
-                        .position(|&c| c == equals)
-                        .is_some()
+                        .any(|&c| c == equals)
                     {
                         result.push(
                             OsString::from_wide(&raw_env[begin..end])
